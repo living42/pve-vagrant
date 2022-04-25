@@ -54,27 +54,18 @@ popd
 # https://www.vagrantup.com/docs/providers/virtualbox/boxes#virtualbox-guest-additions
 apt-get -y -q install pve-headers-$(uname -r) build-essential dkms
 
-wget --progress dot:mega https://download.virtualbox.org/virtualbox/6.1.34/VBoxGuestAdditions_6.1.34.iso
 mkdir /media/VBoxGuestAdditions
-mount -o loop,ro VBoxGuestAdditions_6.1.34.iso /media/VBoxGuestAdditions
+mount -o loop,ro /root/VBoxGuestAdditions.iso /media/VBoxGuestAdditions
 # dont't known why it exit with code 2
 sh /media/VBoxGuestAdditions/VBoxLinuxAdditions.run || true
-rm VBoxGuestAdditions_6.1.34.iso
+rm /root/VBoxGuestAdditions.iso
 umount /media/VBoxGuestAdditions
 rmdir /media/VBoxGuestAdditions
-
-# install rsync and sshfs to support shared folders in vagrant.
-apt-get install -y rsync sshfs
 
 # disable the DNS reverse lookup on the SSH server. this stops it from
 # trying to resolve the client IP address into a DNS domain name, which
 # is kinda slow and does not normally work when running inside VB.
 echo UseDNS no >>/etc/ssh/sshd_config
-
-# make sure the ssh connections are properly closed when the system is shutdown.
-# NB this is needed for vagrant reload and vagrant-reload plugin.
-# NB this also needs UsePAM yes in sshd_config (which is already there).
-apt-get install -y libpam-systemd
 
 # disable the graphical terminal. its kinda slow and useless on a VM.
 sed -i -E 's,#(GRUB_TERMINAL\s*=).*,\1console,g' /etc/default/grub
@@ -108,3 +99,20 @@ rm -f /var/lib/systemd/random-seed
 # clean packages.
 apt-get -y autoremove
 apt-get -y clean
+
+# show the free space.
+df -h /
+
+# zero the free disk space -- for better compression of the box file.
+while true; do
+    output="$(fstrim -v /)"
+    cat <<<"$output"
+    sync
+    sleep 15
+    bytes_trimmed="$(echo "$output" | perl -n -e '/\((\d+) bytes\)/ && print $1')"
+    # NB if this never reaches zero, it might be because there is not
+    #    enough free space for completing the trim.
+    if (( bytes_trimmed < $((4*1024*1024)) )); then # < 4 MiB is good enough.
+        break
+    fi
+done
