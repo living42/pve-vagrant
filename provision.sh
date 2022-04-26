@@ -25,8 +25,14 @@ iface lo inet loopback
 auto eth0
 iface eth0 inet dhcp
 
+auto eth1
+iface eth1 inet manual
+
 auto vmbr0
-iface vmbr0 inet manual
+iface vmbr0 inet dhcp
+        bridge-ports eth1
+        bridge-stp off
+        bridge-fd 0
 EOF
 
 apt-get update
